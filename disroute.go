@@ -25,6 +25,34 @@ type HandlerFunc func(*Ctx) Response
 type Router struct {
 	session  *discordgo.Session
 	handlers map[string]HandlerFunc
+
+	responseHandler func(*Ctx, *Response)
+}
+
+var defaultResponseHandler = func(ctx *Ctx, resp *Response) {
+	if resp.Err != nil {
+		_ = ctx.Session().InteractionRespond(ctx.Interaction(), &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: resp.Err.Error(),
+			},
+		})
+
+		return
+	}
+
+	if resp.CustomResponse != nil {
+		_ = ctx.Session().InteractionRespond(ctx.Interaction(), resp.CustomResponse)
+
+		return
+	}
+
+	_ = ctx.Session().InteractionRespond(ctx.Interaction(), &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content: resp.Message,
+		},
+	})
 }
 
 func New(token string) (*Router, error) {
@@ -36,7 +64,13 @@ func New(token string) (*Router, error) {
 	return &Router{
 		session:  s,
 		handlers: make(map[string]HandlerFunc),
+
+		responseHandler: defaultResponseHandler,
 	}, nil
+}
+
+func (r *Router) SetResponseHandler(h func(*Ctx, *Response)) {
+	r.responseHandler = h
 }
 
 func (r *Router) Handle(cmd *discordgo.ApplicationCommand, h HandlerFunc) {
@@ -69,29 +103,7 @@ func (r *Router) InteractionHandler(_ *discordgo.Session, i *discordgo.Interacti
 
 	resp := h(ctx)
 
-	if resp.Err != nil {
-		r.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{
-				Content: resp.Err.Error(),
-			},
-		})
-
-		return
-	}
-
-	if resp.CustomResponse != nil {
-		r.session.InteractionRespond(i.Interaction, resp.CustomResponse)
-
-		return
-	}
-
-	r.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-		Type: discordgo.InteractionResponseChannelMessageWithSource,
-		Data: &discordgo.InteractionResponseData{
-			Content: resp.Message,
-		},
-	})
+	r.responseHandler(ctx, &resp)
 }
 
 func (r *Router) Session() *discordgo.Session {
