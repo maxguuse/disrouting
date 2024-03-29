@@ -103,6 +103,16 @@ func (r *Router) InteractionHandler(_ *discordgo.Session, i *discordgo.Interacti
 		Options: hd.opts,
 	})
 
+	switch i.Type {
+	case discordgo.InteractionApplicationCommand:
+		r.handleCommand(hd, ctx)
+	case discordgo.InteractionApplicationCommandAutocomplete:
+		r.handleAutocomplete(hd, ctx)
+	}
+
+}
+
+func (r *Router) handleCommand(hd *handlerData, ctx *Ctx) {
 	h, ok := r.handlers[hd.path]
 	if !ok {
 		return
@@ -111,6 +121,22 @@ func (r *Router) InteractionHandler(_ *discordgo.Session, i *discordgo.Interacti
 	resp := h(ctx)
 
 	r.responseHandler(ctx, &resp)
+}
+
+func (r *Router) handleAutocomplete(hd *handlerData, ctx *Ctx) {
+	h, ok := r.autocomp[hd.path]
+	if !ok {
+		return
+	}
+
+	resp := h(ctx)
+
+	_ = r.session.InteractionRespond(ctx.Interaction(), &discordgo.InteractionResponse{ // Add logger to router struct and log errors
+		Type: discordgo.InteractionApplicationCommandAutocompleteResult,
+		Data: &discordgo.InteractionResponseData{
+			Choices: resp,
+		},
+	})
 }
 
 func (r *Router) Session() *discordgo.Session {
