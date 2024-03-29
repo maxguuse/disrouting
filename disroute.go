@@ -25,6 +25,7 @@ type HandlerFunc func(*Ctx) Response
 type Router struct {
 	session  *discordgo.Session
 	handlers map[string]HandlerFunc
+	autocomp map[string]AutocompleteFunc
 
 	responseHandler func(*Ctx, *Response)
 }
@@ -64,6 +65,7 @@ func New(token string) (*Router, error) {
 	return &Router{
 		session:  s,
 		handlers: make(map[string]HandlerFunc),
+		autocomp: make(map[string]AutocompleteFunc),
 
 		responseHandler: defaultResponseHandler,
 	}, nil
@@ -73,9 +75,9 @@ func (r *Router) SetResponseHandler(h func(*Ctx, *Response)) {
 	r.responseHandler = h
 }
 
-func (r *Router) Handle(cmd *discordgo.ApplicationCommand, h HandlerFunc) {
+func (r *Router) Handle(cmd *discordgo.ApplicationCommand, h HandlerFunc) *AutocompletionBundle {
 	if _, ok := r.handlers[cmd.Name]; ok {
-		return
+		return nil
 	}
 
 	r.handlers[cmd.Name] = h
@@ -83,6 +85,11 @@ func (r *Router) Handle(cmd *discordgo.ApplicationCommand, h HandlerFunc) {
 	_, err := r.session.ApplicationCommandCreate(r.session.State.User.ID, "", cmd)
 	if err != nil {
 		panic(err)
+	}
+
+	return &AutocompletionBundle{
+		router: r,
+		path:   cmd.Name,
 	}
 }
 
@@ -126,9 +133,9 @@ type SubRouter struct {
 	lastOptions *[]*discordgo.ApplicationCommandOption
 }
 
-func (r *SubRouter) Handle(cmd *discordgo.ApplicationCommandOption, h HandlerFunc) {
+func (r *SubRouter) Handle(cmd *discordgo.ApplicationCommandOption, h HandlerFunc) *AutocompletionBundle {
 	if cmd.Type != discordgo.ApplicationCommandOptionSubCommand {
-		return
+		return nil
 	}
 
 	path := r.basePath + ":" + cmd.Name
@@ -139,6 +146,11 @@ func (r *SubRouter) Handle(cmd *discordgo.ApplicationCommandOption, h HandlerFun
 	_, err := r.root.session.ApplicationCommandCreate(r.root.session.State.User.ID, "", r.baseCmd)
 	if err != nil {
 		panic(err)
+	}
+
+	return &AutocompletionBundle{
+		router: r.root,
+		path:   path,
 	}
 }
 
@@ -155,4 +167,15 @@ func (r *SubRouter) Group(cmd *discordgo.ApplicationCommandOption) *SubRouter {
 		basePath:    r.basePath + ":" + cmd.Name,
 		lastOptions: &cmd.Options,
 	}
+}
+
+type AutocompleteFunc func(*Ctx) []*discordgo.ApplicationCommandOptionChoice
+
+type AutocompletionBundle struct {
+	router *Router
+	path   string
+}
+
+func (b *AutocompletionBundle) WithAutocompletion(h AutocompleteFunc) {
+	b.router.autocomp[b.path] = h
 }
