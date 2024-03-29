@@ -43,6 +43,7 @@ func (c *Ctx) Context() context.Context {
 }
 
 type Response struct {
-	Message string
-	Err     error
+	Message        string
+	CustomResponse *discordgo.InteractionResponse
+	Err            error
 }
