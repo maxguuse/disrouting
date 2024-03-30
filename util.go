@@ -24,12 +24,12 @@ func buildHandlerData(i *discordgo.Interaction) *handlerData {
 		}
 	}
 
-	if d.Options[0].Type == TypeSubcommand {
+	if d.Options[0].Type == discordgo.ApplicationCommandOptionSubCommand {
 		pathParts = append(pathParts, d.Options[0].Name)
 		options = buildOptionsMap(d.Options[0].Options)
 	}
 
-	if d.Options[0].Type == TypeSubcommandGroup {
+	if d.Options[0].Type == discordgo.ApplicationCommandOptionSubCommandGroup {
 		pathParts = append(pathParts,
 			d.Options[0].Name,
 			d.Options[0].Options[0].Name,
