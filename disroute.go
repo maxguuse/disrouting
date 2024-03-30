@@ -29,10 +29,12 @@ type Router struct {
 
 	middlewares []MiddlewareFunc
 
-	handlers map[string]HandlerFunc
-	autocomp map[string]AutocompleteFunc
+	handlers   map[string]HandlerFunc
+	autocomp   map[string]AutocompleteFunc
+	components map[string]HandlerFunc
 
-	responseHandler func(*Ctx, *Response)
+	componentKeyFunc func(*discordgo.Interaction) string
+	responseHandler  func(*Ctx, *Response)
 }
 
 var defaultResponseHandler = func(ctx *Ctx, resp *Response) {
@@ -61,6 +63,10 @@ var defaultResponseHandler = func(ctx *Ctx, resp *Response) {
 	})
 }
 
+var defaultComponentKeyFunc = func(i *discordgo.Interaction) string {
+	return i.MessageComponentData().CustomID
+}
+
 func New(token string) (*Router, error) {
 	s, err := discordgo.New("Bot " + token)
 	if err != nil {
@@ -68,16 +74,35 @@ func New(token string) (*Router, error) {
 	}
 
 	return &Router{
-		session:  s,
-		handlers: make(map[string]HandlerFunc),
-		autocomp: make(map[string]AutocompleteFunc),
+		session: s,
 
-		responseHandler: defaultResponseHandler,
+		handlers:   make(map[string]HandlerFunc),
+		autocomp:   make(map[string]AutocompleteFunc),
+		components: make(map[string]HandlerFunc),
+
+		responseHandler:  defaultResponseHandler,
+		componentKeyFunc: defaultComponentKeyFunc,
 	}, nil
 }
 
 func (r *Router) SetResponseHandler(h func(*Ctx, *Response)) {
 	r.responseHandler = h
+}
+
+func (r *Router) SetComponentKeyFunc(f func(*discordgo.Interaction) (key string)) {
+	r.componentKeyFunc = f
+}
+
+func (r *Router) HandleComponent(key string, h HandlerFunc) {
+	if _, ok := r.components[key]; ok {
+		return
+	}
+
+	for i := len(r.middlewares) - 1; i >= 0; i-- {
+		h = r.middlewares[i](h)
+	}
+
+	r.components[key] = h
 }
 
 func (r *Router) Use(mw1 MiddlewareFunc, mw ...MiddlewareFunc) {
@@ -111,7 +136,7 @@ func (r *Router) Handle(cmd *discordgo.ApplicationCommand, h HandlerFunc) *Autoc
 
 	r.handlers[cmd.Name] = h
 
-	_, err := r.session.ApplicationCommandCreate(r.session.State.User.ID, "", cmd)
+	_, err := r.session.ApplicationCommandCreate(r.session.State.User.ID, "1209837831284072469", cmd)
 	if err != nil {
 		panic(err)
 	}
@@ -123,25 +148,31 @@ func (r *Router) Handle(cmd *discordgo.ApplicationCommand, h HandlerFunc) *Autoc
 }
 
 func (r *Router) InteractionHandler(_ *discordgo.Session, i *discordgo.InteractionCreate) {
-	hd := buildHandlerData(i)
+	if i.Type == discordgo.InteractionPing || i.Type == discordgo.InteractionModalSubmit {
+		return
+	}
 
 	ctx := newCtx(&ctxParams{
 		Session: r.session,
 		i:       i.Interaction,
 		ctx:     context.Background(),
-		Options: hd.opts,
+		Options: nil,
 	})
 
 	switch i.Type {
 	case discordgo.InteractionApplicationCommand:
-		r.handleCommand(hd, ctx)
+		r.handleCommand(ctx)
 	case discordgo.InteractionApplicationCommandAutocomplete:
-		r.handleAutocomplete(hd, ctx)
+		r.handleAutocomplete(ctx)
+	case discordgo.InteractionMessageComponent:
+		r.handleComponent(ctx)
 	}
-
 }
 
-func (r *Router) handleCommand(hd *handlerData, ctx *Ctx) {
+func (r *Router) handleCommand(ctx *Ctx) {
+	hd := buildHandlerData(ctx.Interaction())
+	ctx.Options = hd.opts
+
 	h, ok := r.handlers[hd.path]
 	if !ok {
 		return
@@ -152,7 +183,10 @@ func (r *Router) handleCommand(hd *handlerData, ctx *Ctx) {
 	r.responseHandler(ctx, &resp)
 }
 
-func (r *Router) handleAutocomplete(hd *handlerData, ctx *Ctx) {
+func (r *Router) handleAutocomplete(ctx *Ctx) {
+	hd := buildHandlerData(ctx.Interaction())
+	ctx.Options = hd.opts
+
 	h, ok := r.autocomp[hd.path]
 	if !ok {
 		return
@@ -166,6 +200,19 @@ func (r *Router) handleAutocomplete(hd *handlerData, ctx *Ctx) {
 			Choices: resp,
 		},
 	})
+}
+
+func (r *Router) handleComponent(ctx *Ctx) {
+	path := r.componentKeyFunc(ctx.Interaction())
+
+	h, ok := r.components[path]
+	if !ok {
+		return
+	}
+
+	resp := h(ctx)
+
+	r.responseHandler(ctx, &resp)
 }
 
 func (r *Router) Session() *discordgo.Session {
@@ -228,7 +275,7 @@ func (r *SubRouter) Handle(cmd *discordgo.ApplicationCommandOption, h HandlerFun
 
 	*r.lastOptions = append(*r.lastOptions, cmd)
 
-	_, err := r.root.session.ApplicationCommandCreate(r.root.session.State.User.ID, "", r.baseCmd)
+	_, err := r.root.session.ApplicationCommandCreate(r.root.session.State.User.ID, "1209837831284072469", r.baseCmd)
 	if err != nil {
 		panic(err)
 	}
