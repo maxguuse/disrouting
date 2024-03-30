@@ -22,8 +22,13 @@ type OptionsMap map[string]*discordgo.ApplicationCommandInteractionDataOption
 
 type HandlerFunc func(*Ctx) Response
 
+type MiddlewareFunc func(HandlerFunc) HandlerFunc
+
 type Router struct {
-	session  *discordgo.Session
+	session *discordgo.Session
+
+	middlewares []MiddlewareFunc
+
 	handlers map[string]HandlerFunc
 	autocomp map[string]AutocompleteFunc
 
@@ -75,9 +80,33 @@ func (r *Router) SetResponseHandler(h func(*Ctx, *Response)) {
 	r.responseHandler = h
 }
 
+func (r *Router) Use(mw1 MiddlewareFunc, mw ...MiddlewareFunc) {
+	r.middlewares = append(r.middlewares, mw1)
+	r.middlewares = append(r.middlewares, mw...)
+}
+
+func (r *Router) With(mw1 MiddlewareFunc, mw ...MiddlewareFunc) *Router {
+	newMiddlewares := make([]MiddlewareFunc, len(r.middlewares), len(r.middlewares)+len(mw)+1)
+	copy(newMiddlewares, r.middlewares)
+	newMiddlewares = append(newMiddlewares, mw1)
+	newMiddlewares = append(newMiddlewares, mw...)
+
+	return &Router{
+		session:         r.session,
+		middlewares:     newMiddlewares,
+		handlers:        r.handlers,
+		autocomp:        r.autocomp,
+		responseHandler: r.responseHandler,
+	}
+}
+
 func (r *Router) Handle(cmd *discordgo.ApplicationCommand, h HandlerFunc) *AutocompletionBundle {
 	if _, ok := r.handlers[cmd.Name]; ok {
 		return nil
+	}
+
+	for i := len(r.middlewares) - 1; i >= 0; i-- {
+		h = r.middlewares[i](h)
 	}
 
 	r.handlers[cmd.Name] = h
@@ -144,11 +173,15 @@ func (r *Router) Session() *discordgo.Session {
 }
 
 func (r *Router) Mount(cmd *discordgo.ApplicationCommand) *SubRouter {
+	newMiddlewares := make([]MiddlewareFunc, len(r.middlewares))
+	copy(newMiddlewares, r.middlewares)
+
 	return &SubRouter{
 		root:        r,
 		baseCmd:     cmd,
 		basePath:    cmd.Name,
 		lastOptions: &cmd.Options,
+		middlewares: newMiddlewares,
 	}
 }
 
@@ -157,6 +190,27 @@ type SubRouter struct {
 	baseCmd     *discordgo.ApplicationCommand
 	basePath    string
 	lastOptions *[]*discordgo.ApplicationCommandOption
+	middlewares []MiddlewareFunc
+}
+
+func (r *SubRouter) Use(mw1 MiddlewareFunc, mw ...MiddlewareFunc) {
+	r.middlewares = append(r.middlewares, mw1)
+	r.middlewares = append(r.middlewares, mw...)
+}
+
+func (r *SubRouter) With(mw1 MiddlewareFunc, mw ...MiddlewareFunc) *SubRouter {
+	newMiddlewares := make([]MiddlewareFunc, len(r.middlewares), len(r.middlewares)+len(mw)+1)
+	copy(newMiddlewares, r.middlewares)
+	newMiddlewares = append(newMiddlewares, mw1)
+	newMiddlewares = append(newMiddlewares, mw...)
+
+	return &SubRouter{
+		root:        r.root,
+		baseCmd:     r.baseCmd,
+		basePath:    r.basePath,
+		lastOptions: r.lastOptions,
+		middlewares: newMiddlewares,
+	}
 }
 
 func (r *SubRouter) Handle(cmd *discordgo.ApplicationCommandOption, h HandlerFunc) *AutocompletionBundle {
@@ -165,6 +219,11 @@ func (r *SubRouter) Handle(cmd *discordgo.ApplicationCommandOption, h HandlerFun
 	}
 
 	path := r.basePath + ":" + cmd.Name
+
+	for i := len(r.middlewares) - 1; i >= 0; i-- {
+		h = r.middlewares[i](h)
+	}
+
 	r.root.handlers[path] = h
 
 	*r.lastOptions = append(*r.lastOptions, cmd)
@@ -187,11 +246,15 @@ func (r *SubRouter) Group(cmd *discordgo.ApplicationCommandOption) *SubRouter {
 
 	*r.lastOptions = append(*r.lastOptions, cmd)
 
+	newMiddlewares := make([]MiddlewareFunc, len(r.middlewares))
+	copy(newMiddlewares, r.middlewares)
+
 	return &SubRouter{
 		root:        r.root,
 		baseCmd:     r.baseCmd,
 		basePath:    r.basePath + ":" + cmd.Name,
 		lastOptions: &cmd.Options,
+		middlewares: newMiddlewares,
 	}
 }
 
