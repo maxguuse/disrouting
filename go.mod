@@ -2,7 +2,7 @@ module github.com/maxguuse/disroute
 
 go 1.21.5
 
-require github.com/bwmarrin/discordgo v0.27.1
+require github.com/bwmarrin/discordgo v0.27.2-0.20240315152229-33ee38cbf271
 
 require (
 	github.com/gorilla/websocket v1.4.2 // indirect
