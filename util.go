@@ -11,7 +11,7 @@ type handlerData struct {
 	opts map[string]*DiscordCmdOption
 }
 
-func buildHandlerData(i *discordgo.InteractionCreate) *handlerData {
+func buildHandlerData(i *discordgo.Interaction) *handlerData {
 	d := i.ApplicationCommandData()
 
 	pathParts := []string{d.Name}
