@@ -28,6 +28,15 @@ var defaultResponseHandler = func(ctx *Ctx, resp *Response) {
 	})
 }
 
+var defaultAutocompleteHandler = func(ctx *Ctx, choices []*discordgo.ApplicationCommandOptionChoice) {
+	_ = ctx.Session().InteractionRespond(ctx.Interaction(), &discordgo.InteractionResponse{
+		Type: discordgo.InteractionApplicationCommandAutocompleteResult,
+		Data: &discordgo.InteractionResponseData{
+			Choices: choices,
+		},
+	})
+}
+
 var defaultComponentKeyFunc = func(i *discordgo.Interaction) string {
 	return i.MessageComponentData().CustomID
 }

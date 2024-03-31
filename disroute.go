@@ -15,8 +15,9 @@ type Router struct {
 	autocomp   map[string]AutocompleteFunc
 	components map[string]HandlerFunc
 
-	componentKeyFunc func(*discordgo.Interaction) string
-	responseHandler  func(*Ctx, *Response)
+	responseHandler     func(*Ctx, *Response)
+	autocompleteHandler func(*Ctx, []*discordgo.ApplicationCommandOptionChoice)
+	componentKeyFunc    func(*discordgo.Interaction) string
 }
 
 func New(token string) (*Router, error) {
@@ -34,8 +35,9 @@ func New(token string) (*Router, error) {
 		autocomp:   make(map[string]AutocompleteFunc),
 		components: make(map[string]HandlerFunc),
 
-		responseHandler:  defaultResponseHandler,
-		componentKeyFunc: defaultComponentKeyFunc,
+		responseHandler:     defaultResponseHandler,
+		autocompleteHandler: defaultAutocompleteHandler,
+		componentKeyFunc:    defaultComponentKeyFunc,
 	}, nil
 }
 
@@ -55,6 +57,10 @@ func (r *Router) Open() error {
 
 func (r *Router) SetResponseHandler(h func(*Ctx, *Response)) {
 	r.responseHandler = h
+}
+
+func (r *Router) SetAutocompleteHandler(h func(*Ctx, []*discordgo.ApplicationCommandOptionChoice)) {
+	r.autocompleteHandler = h
 }
 
 func (r *Router) SetComponentKeyFunc(f func(*discordgo.Interaction) (key string)) {
