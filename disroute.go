@@ -4,35 +4,8 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-type commandRegisterer interface {
-	ApplicationCommandCreate(string, string, *discordgo.ApplicationCommand, ...discordgo.RequestOption) (*discordgo.ApplicationCommand, error)
-}
-
-type commandRegistererImpl struct {
-	*discordgo.Session
-}
-
-func (c *commandRegistererImpl) ApplicationCommandCreate(appID string, guildID string, cmd *discordgo.ApplicationCommand, options ...discordgo.RequestOption) (*discordgo.ApplicationCommand, error) {
-	return c.Session.ApplicationCommandCreate(appID, guildID, cmd, options...)
-}
-
-type interactionResponder interface {
-	InteractionRespond(*discordgo.Interaction, *discordgo.InteractionResponse, ...discordgo.RequestOption) error
-}
-
-type interactionResponderImpl struct {
-	*discordgo.Session
-}
-
-func (i *interactionResponderImpl) InteractionRespond(interaction *discordgo.Interaction, resp *discordgo.InteractionResponse, options ...discordgo.RequestOption) error {
-	return i.Session.InteractionRespond(interaction, resp, options...)
-}
-
 type Router struct {
 	session *discordgo.Session
-
-	cr commandRegisterer
-	ir interactionResponder
 
 	middlewares []MiddlewareFunc
 
@@ -52,9 +25,6 @@ func New(token string) (*Router, error) {
 
 	return &Router{
 		session: s,
-
-		cr: &commandRegistererImpl{s},
-		ir: &interactionResponderImpl{s},
 
 		handlers:   make(map[string]HandlerFunc),
 		autocomp:   make(map[string]AutocompleteFunc),
@@ -88,7 +58,7 @@ func (r *Router) Handle(cmd *discordgo.ApplicationCommand, h HandlerFunc) *Autoc
 
 	r.handlers[cmd.Name] = h
 
-	_, err := r.cr.ApplicationCommandCreate(r.session.State.User.ID, "", cmd)
+	_, err := r.session.ApplicationCommandCreate(r.session.State.User.ID, "", cmd)
 	if err != nil {
 		panic(err)
 	}
