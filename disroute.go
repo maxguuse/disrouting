@@ -7,7 +7,7 @@ import (
 type Router struct {
 	session *discordgo.Session
 
-	cmds []*discordgo.ApplicationCommand
+	cmds *[]*discordgo.ApplicationCommand
 
 	middlewares []MiddlewareFunc
 
@@ -26,10 +26,12 @@ func New(token string) (*Router, error) {
 		return nil, err
 	}
 
+	cmds := make([]*discordgo.ApplicationCommand, 0, 100)
+
 	return &Router{
 		session: s,
 
-		cmds: make([]*discordgo.ApplicationCommand, 0, 100),
+		cmds: &cmds,
 
 		handlers:   make(map[string]HandlerFunc),
 		autocomp:   make(map[string]AutocompleteFunc),
@@ -47,7 +49,7 @@ func (r *Router) Open() error {
 		return err
 	}
 
-	_, err = r.session.ApplicationCommandBulkOverwrite(r.session.State.User.ID, "", r.cmds)
+	_, err = r.session.ApplicationCommandBulkOverwrite(r.session.State.User.ID, "", *r.cmds)
 	if err != nil {
 		return err
 	}
@@ -81,7 +83,7 @@ func (r *Router) Handle(cmd *discordgo.ApplicationCommand, h HandlerFunc) *Autoc
 	}
 
 	r.handlers[cmd.Name] = h
-	r.cmds = append(r.cmds, cmd)
+	*r.cmds = append(*r.cmds, cmd)
 
 	return &AutocompletionBundle{
 		router: r,
@@ -105,7 +107,7 @@ func (r *Router) Mount(cmd *discordgo.ApplicationCommand) *SubRouter {
 	newMiddlewares := make([]MiddlewareFunc, len(r.middlewares))
 	copy(newMiddlewares, r.middlewares)
 
-	r.cmds = append(r.cmds, cmd)
+	*r.cmds = append(*r.cmds, cmd)
 
 	return &SubRouter{
 		root:        r,
