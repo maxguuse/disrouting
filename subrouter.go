@@ -25,7 +25,7 @@ func (r *SubRouter) Handle(cmd *discordgo.ApplicationCommandOption, h HandlerFun
 
 	*r.lastOptions = append(*r.lastOptions, cmd)
 
-	_, err := r.root.session.ApplicationCommandCreate(r.root.session.State.User.ID, "", r.baseCmd)
+	_, err := r.root.cr.ApplicationCommandCreate(r.root.session.State.User.ID, "", r.baseCmd)
 	if err != nil {
 		panic(err)
 	}
