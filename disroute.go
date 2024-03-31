@@ -128,10 +128,13 @@ func (r *Router) With(mw1 MiddlewareFunc, mw ...MiddlewareFunc) *Router {
 	newMiddlewares = append(newMiddlewares, mw...)
 
 	return &Router{
-		session:         r.session,
-		middlewares:     newMiddlewares,
-		handlers:        r.handlers,
-		autocomp:        r.autocomp,
-		responseHandler: r.responseHandler,
+		session:             r.session,
+		middlewares:         newMiddlewares,
+		handlers:            r.handlers,
+		autocomp:            r.autocomp,
+		components:          r.components,
+		responseHandler:     r.responseHandler,
+		autocompleteHandler: r.autocompleteHandler,
+		componentKeyFunc:    r.componentKeyFunc,
 	}
 }
