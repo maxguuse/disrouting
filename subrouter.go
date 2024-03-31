@@ -24,7 +24,6 @@ func (r *SubRouter) Handle(cmd *discordgo.ApplicationCommandOption, h HandlerFun
 	r.root.handlers[path] = h
 
 	*r.lastOptions = append(*r.lastOptions, cmd)
-	r.root.cmds = append(r.root.cmds, r.baseCmd)
 
 	return &AutocompletionBundle{
 		router: r.root,

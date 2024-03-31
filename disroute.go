@@ -99,6 +99,8 @@ func (r *Router) Mount(cmd *discordgo.ApplicationCommand) *SubRouter {
 	newMiddlewares := make([]MiddlewareFunc, len(r.middlewares))
 	copy(newMiddlewares, r.middlewares)
 
+	r.cmds = append(r.cmds, cmd)
+
 	return &SubRouter{
 		root:        r,
 		baseCmd:     cmd,
