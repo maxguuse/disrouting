@@ -130,6 +130,7 @@ func (r *Router) With(mw1 MiddlewareFunc, mw ...MiddlewareFunc) *Router {
 	return &Router{
 		session:             r.session,
 		middlewares:         newMiddlewares,
+		cmds:                r.cmds,
 		handlers:            r.handlers,
 		autocomp:            r.autocomp,
 		components:          r.components,
