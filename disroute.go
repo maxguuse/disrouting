@@ -7,6 +7,8 @@ import (
 type Router struct {
 	session *discordgo.Session
 
+	cmds []*discordgo.ApplicationCommand
+
 	middlewares []MiddlewareFunc
 
 	handlers   map[string]HandlerFunc
@@ -26,6 +28,8 @@ func New(token string) (*Router, error) {
 	return &Router{
 		session: s,
 
+		cmds: make([]*discordgo.ApplicationCommand, 0, 100),
+
 		handlers:   make(map[string]HandlerFunc),
 		autocomp:   make(map[string]AutocompleteFunc),
 		components: make(map[string]HandlerFunc),
@@ -33,6 +37,20 @@ func New(token string) (*Router, error) {
 		responseHandler:  defaultResponseHandler,
 		componentKeyFunc: defaultComponentKeyFunc,
 	}, nil
+}
+
+func (r *Router) Open() error {
+	err := r.session.Open()
+	if err != nil {
+		return err
+	}
+
+	_, err = r.session.ApplicationCommandBulkOverwrite(r.session.State.User.ID, "", r.cmds)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (r *Router) SetResponseHandler(h func(*Ctx, *Response)) {
@@ -57,11 +75,7 @@ func (r *Router) Handle(cmd *discordgo.ApplicationCommand, h HandlerFunc) *Autoc
 	}
 
 	r.handlers[cmd.Name] = h
-
-	_, err := r.session.ApplicationCommandCreate(r.session.State.User.ID, "", cmd)
-	if err != nil {
-		panic(err)
-	}
+	r.cmds = append(r.cmds, cmd)
 
 	return &AutocompletionBundle{
 		router: r,
