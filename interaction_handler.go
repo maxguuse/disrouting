@@ -53,12 +53,7 @@ func (r *Router) handleAutocomplete(ctx *Ctx) {
 
 	resp := h(ctx)
 
-	_ = r.session.InteractionRespond(ctx.Interaction(), &discordgo.InteractionResponse{ // Add logger to router struct and log errors
-		Type: discordgo.InteractionApplicationCommandAutocompleteResult,
-		Data: &discordgo.InteractionResponseData{
-			Choices: resp,
-		},
-	})
+	r.autocompleteHandler(ctx, resp)
 }
 
 func (r *Router) handleComponent(ctx *Ctx) {
